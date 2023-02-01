@@ -83,7 +83,7 @@ public:
   std::unique_ptr<World> _world;
 private:
 
-  float _2d_zoom = 1.f;
+  float _2d_zoom = 0.20f;
   float moving, strafing, updown, mousedir, turn, lookat;
   math::vector_3d _cursor_pos;
 
@@ -100,7 +100,7 @@ private:
   noggit::bool_toggle_property _draw_wmo = {true};
   noggit::bool_toggle_property _draw_water = {true};
   noggit::bool_toggle_property _draw_wmo_doodads = {true};
-  noggit::bool_toggle_property _draw_models = {true};
+  noggit::bool_toggle_property _draw_models = {false};
   noggit::bool_toggle_property _draw_model_animations = {false};
   noggit::bool_toggle_property _draw_hole_lines = {false};
   noggit::bool_toggle_property _draw_models_with_box = {false};

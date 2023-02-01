@@ -88,6 +88,9 @@ void Noggit::loadMPQs()
   archiveNames.push_back("patch-{number}.MPQ");
   archiveNames.push_back("patch-{character}.MPQ");
 
+  // dev
+  archiveNames.push_back("patch-D.MPQ");
+
   //archiveNames.push_back( "{locale}/backup-{locale}.MPQ" );
   //archiveNames.push_back( "{locale}/base-{locale}.MPQ" );
   archiveNames.push_back("{locale}/locale-{locale}.MPQ");

@@ -50,6 +50,7 @@ namespace noggit
                       );
 
       void createBookmarkList();
+      void load_map_from_env();
       void build_menu();
       void rebuild_menu();
 

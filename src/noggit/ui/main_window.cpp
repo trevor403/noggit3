@@ -74,6 +74,11 @@ namespace noggit
                          }
                        );
 
+
+      // auto open_action (file_menu->addAction ("Open"));
+      // open_action->setShortcut (QKeySequence (Qt::Key_M));
+      // QObject::connect (open_action, &QAction::triggered, load_map_from_env);
+
       auto mapmenu_action (file_menu->addAction ("Exit"));
       QObject::connect ( mapmenu_action, &QAction::triggered
                        , [this]
@@ -83,6 +88,7 @@ namespace noggit
                        );
 
       build_menu();
+      load_map_from_env();
     }
 
     void main_window::check_uid_then_enter_map
@@ -165,6 +171,42 @@ namespace noggit
       }
 
       LogError << "Map with ID " << mapID << " not found. Failed loading." << std::endl;
+    }
+
+    void main_window::load_map_from_env()
+    {
+      std::cout << "Loading map..." << std::endl;
+      int mapID = std::stoi(std::getenv("MAP_ID"));
+
+      float raw_z = std::stof(std::getenv("MAP_POS_Z"));
+      float raw_x = std::stof(std::getenv("MAP_POS_X"));
+
+      float z = (ZEROPOINT - raw_z);
+      float x = (ZEROPOINT - raw_x);
+      float y = 0; // std::stof(std::getenv("MAP_POS_Y"));
+      math::vector_3d pos (x, y, z);
+
+      float camera_pitch = 90;
+      float camera_yaw = 90;
+
+    std::cout << "Map: " << raw_x << " " << y << " " << raw_z << " " << mapID << std::endl;
+
+      _world.reset();
+
+      for (DBCFile::Iterator it = gMapDB.begin(); it != gMapDB.end(); ++it)
+      {
+        if (it->getInt(MapDB::MapID) == mapID)
+        {
+          _world = std::make_unique<World> (it->getString(MapDB::InternalName), mapID);
+          check_uid_then_enter_map ( pos
+                                  , math::degrees (camera_pitch)
+                                  , math::degrees (camera_yaw)
+                                  , false
+                                  );
+
+          return;
+        }
+      }
     }
 
     void main_window::build_menu()

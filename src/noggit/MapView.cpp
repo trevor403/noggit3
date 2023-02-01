@@ -758,6 +758,7 @@ void MapView::createGUI()
 
 
     _main_window->statusBar()->setVisible(ui_hidden);
+    _main_window->menuBar()->setVisible(ui_hidden);
     _toolbar->setVisible(ui_hidden);
 
     ui_hidden = !ui_hidden;
@@ -767,7 +768,7 @@ void MapView::createGUI()
   };
 
   ADD_ACTION(view_menu, "Toggle UI", Qt::Key_Tab, hide_widgets);
-
+  hide_widgets();
 
   ADD_TOGGLE (view_menu, "Detail infos", Qt::Key_F8, _show_detail_info_window);
   connect ( &_show_detail_info_window, &noggit::bool_toggle_property::changed
@@ -1025,9 +1026,20 @@ void MapView::createGUI()
                {
                  std::ofstream f("ports.txt", std::ios_base::app);
                  f << "Map: " << gAreaDB.getAreaName(_world->getAreaID (_camera.position)) << " on ADT " << std::floor(_camera.position.x / TILESIZE) << " " << std::floor(_camera.position.z / TILESIZE) << std::endl;
-                 f << "Trinity:" << std::endl << ".go " << (ZEROPOINT - _camera.position.z) << " " << (ZEROPOINT - _camera.position.x) << " " << _camera.position.y << " " << _world->getMapID() << std::endl;
+                 f << "Trinity:" << std::endl << ".go xyz " << (ZEROPOINT - _camera.position.z) << " " << (ZEROPOINT - _camera.position.x) << " " << _camera.position.y << " " << _world->getMapID() << std::endl;
                  f << "ArcEmu:" << std::endl << ".worldport " << _world->getMapID() << " " << (ZEROPOINT - _camera.position.z) << " " << (ZEROPOINT - _camera.position.x) << " " << _camera.position.y << " " << std::endl << std::endl;
                  f.close();
+               }
+             );
+
+  ADD_ACTION ( file_menu
+             , "Write position to console"
+             , Qt::Key_K
+             , [this]
+               {
+                  std::cout << "Map: " << _camera.position.z << " " << _camera.position.x << " " << _camera.position.y << std::endl;
+                  std::cout << "Angles: " << _camera.pitch() << " " << _camera.yaw() << std::endl;
+                  std::cout << "Zoom: " << _2d_zoom << std::endl;
                }
              );
 
@@ -1056,8 +1068,9 @@ void MapView::createGUI()
                  else
                  {
                    _display_mode = display_mode::in_2D;
+                   _camera_moved_since_last_draw = true;
                    saveterrainMode = terrainMode;
-                   set_editing_mode (editing_mode::paint);
+                   set_editing_mode (editing_mode::object);
                  }
                }
              );
@@ -1396,7 +1409,7 @@ MapView::MapView( math::degrees camera_yaw0
 
   setWindowTitle ("Noggit Studio - " STRPRODUCTVER);
 
-  cursor_type.set (_settings->value ("cursor/default_type", static_cast<unsigned int>(cursor_mode::terrain)).toUInt());
+  cursor_type.set (_settings->value ("cursor/default_type", static_cast<unsigned int>(cursor_mode::none)).toUInt());
 
   cursor_color.x = _settings->value ("cursor/color/r", 1).toFloat();
   cursor_color.y = _settings->value ("cursor/color/g", 1).toFloat();
@@ -1425,7 +1438,7 @@ MapView::MapView( math::degrees camera_yaw0
   mousedir = -1.0f;
 
   look = false;
-  _display_mode = display_mode::in_3D;
+  _display_mode = display_mode::in_2D;
 
   _tablet_active = true;
 
