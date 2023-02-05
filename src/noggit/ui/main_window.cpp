@@ -98,6 +98,12 @@ namespace noggit
                         , bool from_bookmark
                         )
     {
+      std::cout << "LOADING THIS NOW... "
+                << _world->getMapID() << " "
+                << pos.x << " "
+                << pos.y << " "
+                << pos.z << std::endl;
+
       QSettings settings;
 #ifdef USE_MYSQL_UID_STORAGE
       bool use_mysql = settings.value("project/mysql/enabled", false).toBool();
@@ -178,18 +184,19 @@ namespace noggit
       std::cout << "Loading map..." << std::endl;
       int mapID = std::stoi(std::getenv("MAP_ID"));
 
-      float raw_z = std::stof(std::getenv("MAP_POS_Z"));
-      float raw_x = std::stof(std::getenv("MAP_POS_X"));
+      float raw_z = std::stof(std::getenv("MAP_POS_X"));
+      float raw_x = std::stof(std::getenv("MAP_POS_Y"));
 
       float z = (ZEROPOINT - raw_z);
       float x = (ZEROPOINT - raw_x);
-      float y = 0; // std::stof(std::getenv("MAP_POS_Y"));
+      float y = std::stof(std::getenv("MAP_POS_Z"));
       math::vector_3d pos (x, y, z);
 
       float camera_pitch = 90;
       float camera_yaw = 90;
 
-    std::cout << "Map: " << raw_x << " " << y << " " << raw_z << " " << mapID << std::endl;
+      std::cout << "RAW Map: " << raw_x << " " << y << " " << raw_z << " " << mapID << std::endl;
+      std::cout << "ACT Map: " << x << " " << y << " " << z << " " << mapID << std::endl;
 
       _world.reset();
 
@@ -201,7 +208,7 @@ namespace noggit
           check_uid_then_enter_map ( pos
                                   , math::degrees (camera_pitch)
                                   , math::degrees (camera_yaw)
-                                  , false
+                                  , true
                                   );
 
           return;

@@ -68,6 +68,8 @@
 #include <string>
 #include <vector>
 
+#include <csignal>
+
 static const float XSENS = 15.0f;
 static const float YSENS = 15.0f;
 
@@ -1037,6 +1039,7 @@ void MapView::createGUI()
              , Qt::Key_K
              , [this]
                {
+                  std::cout << "Trinity:" << " MAP_ID=" << _world->getMapID() << " MAP_POS_X=" << (ZEROPOINT - _camera.position.z) << " MAP_POS_Y=" << (ZEROPOINT - _camera.position.x) << " MAP_POS_Z=" << _camera.position.y << std::endl;
                   std::cout << "Map: " << _camera.position.z << " " << _camera.position.x << " " << _camera.position.y << std::endl;
                   std::cout << "Angles: " << _camera.pitch() << " " << _camera.yaw() << std::endl;
                   std::cout << "Zoom: " << _2d_zoom << std::endl;
@@ -1070,7 +1073,7 @@ void MapView::createGUI()
                    _display_mode = display_mode::in_2D;
                    _camera_moved_since_last_draw = true;
                    saveterrainMode = terrainMode;
-                   set_editing_mode (editing_mode::object);
+                   set_editing_mode (editing_mode::holes);
                  }
                }
              );
@@ -1439,6 +1442,7 @@ MapView::MapView( math::degrees camera_yaw0
 
   look = false;
   _display_mode = display_mode::in_2D;
+  // _display_mode = display_mode::in_3D;
 
   _tablet_active = true;
 
@@ -1618,6 +1622,26 @@ void MapView::tick (float dt)
   // start unloading tiles
   _world->mapIndex.enterTile (tile_index (_camera.position));
   _world->mapIndex.unloadTiles (tile_index (_camera.position));
+
+  int _tile_count = 0;
+  for (MapTile* tile : _world->mapIndex.loaded_tiles()) {
+    if (tile != NULL) _tile_count++;
+  }
+
+  _frame_counter++;
+
+  if (_last_tile_count != _tile_count) {
+    _last_tile_count = _tile_count;
+    _last_changed_count_frame = _frame_counter;
+  } else if (_tile_count > 0 && _frame_counter - _last_tile_count > 20) {
+    std::cout << "DONE COMPLETELY FRAME: " << _frame_counter << " delta " << (_frame_counter - _last_tile_count) << std::endl;
+    QImage image = grabFramebuffer();
+    bool saved = image.save("map.png");
+    std::cout << "SAVED FRAME: " << saved << " (" << image.width() << "x" << image.height() << ")" << std::endl;
+    kill(getpid(), SIGINT);
+  } else {
+    std::cout << "INFO FRAME: " << _frame_counter << " tiles: " << _tile_count << std::endl;
+  }
 
   dt = std::min(dt, 1.0f);
 

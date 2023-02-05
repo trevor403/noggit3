@@ -212,7 +212,8 @@ Noggit::Noggit(int argc, char *argv[])
 {
   InitLogging();
   assert (argc >= 1); (void) argc;
-  initPath(argv);
+  // initPath(argv);
+  (void)argv; // unused
 
   NOGGIT_LOG << "Noggit Studio - " << STRPRODUCTVER << std::endl;
 

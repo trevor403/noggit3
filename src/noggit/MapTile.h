@@ -127,6 +127,7 @@ public:
 
   TileWater Water;
 
+  bool tile_is_finished() const { return finished; }
   bool tile_is_being_reloaded() const { return _tile_is_being_reloaded; }
 
 private:
