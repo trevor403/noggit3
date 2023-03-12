@@ -43,6 +43,8 @@
 
 #include "revision.h"
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 
@@ -56,6 +58,7 @@
 #include <QtWidgets/QStatusBar>
 #include <QtWidgets/QComboBox>
 #include <QWidgetAction>
+#include <QString>
 
 #include <algorithm>
 #include <cmath>
@@ -69,9 +72,14 @@
 #include <vector>
 
 #include <csignal>
+#include <ctime>
+#include <chrono>
 
 static const float XSENS = 15.0f;
 static const float YSENS = 15.0f;
+
+static bool first_frame_loaded = false;
+static int frame_wait_delta = 40;
 
 void MapView::set_editing_mode (editing_mode mode)
 {
@@ -770,6 +778,7 @@ void MapView::createGUI()
   };
 
   ADD_ACTION(view_menu, "Toggle UI", Qt::Key_Tab, hide_widgets);
+  // if (std::getenv("SHOW_UI") == NULL);
   hide_widgets();
 
   ADD_TOGGLE (view_menu, "Detail infos", Qt::Key_F8, _show_detail_info_window);
@@ -1449,6 +1458,23 @@ MapView::MapView( math::degrees camera_yaw0
   _startup_time.start();
   _update_every_event_loop.start (0);
   connect (&_update_every_event_loop, &QTimer::timeout, [this] { update(); });
+
+  domain_socket = new QLocalSocket(this);
+  connect (domain_socket, SIGNAL(connected()), this, SLOT(socket_connected_callback()));
+  connect (domain_socket, SIGNAL(disconnected()), this, SLOT(socket_disconnected_callback()));
+  connect (domain_socket, SIGNAL(readyRead()), this, SLOT(socket_ready_read_callback()));
+
+  std::cout << "Connecting..." << std::endl;
+  QString socket = QString::fromStdString(std::getenv("DOMAIN_SOCK"));
+  domain_socket->connectToServer(socket);
+  if (!domain_socket->waitForConnected(50)) {
+      std::cout << "Error: " << domain_socket->errorString().toStdString() << std::endl;
+      kill(getpid(), SIGINT);
+  } else {
+      in.setDevice(domain_socket);
+      in.setVersion(QDataStream::Qt_5_8);
+      block_size = 0;
+  }
 }
 
 void MapView::tabletEvent(QTabletEvent* event)
@@ -1611,6 +1637,81 @@ MapView::~MapView()
   WMOManager::report();
 }
 
+void MapView::socket_connected_callback() {
+  std::cout << "MapView::socket_connected_callback call" << std::endl;
+}
+
+void MapView::socket_disconnected_callback() {
+  std::cout << "MapView::socket_disconnected_callback call" << std::endl;
+  kill(getpid(), SIGINT);
+}
+
+void MapView::socket_ready_read_callback() {
+  std::cout << "MapView::socket_ready_read_callback call" << std::endl;
+
+  int bytes = domain_socket->bytesAvailable();
+
+  if (bytes == 1) {
+    // wait for next inst
+    kill(getpid(), SIGSTOP);
+    return;
+  }
+
+  std::string command;
+  command.resize(bytes);
+  in.readRawData(command.data(), bytes);
+
+  std::cout << bytes << " -> " << command << std::endl;
+
+  std::vector<std::string> parts; 
+  boost::split(parts, command, boost::is_any_of(" "));
+
+  if (parts.size() != 5) {
+    std::cout << "BAD MESSAGE" << std::endl;
+    return;
+  }
+
+  // int mapID = std::stoi(parts[0]); // MAP_ID
+  float zoom = std::stof(parts[4]);
+
+  float raw_z = std::stof(parts[1]); // MAP_POS_X
+  float raw_x = std::stof(parts[2]); // MAP_POS_Y
+
+  float z = (ZEROPOINT - raw_z);
+  float x = (ZEROPOINT - raw_x);
+  float y = std::stof(parts[3]); // MAP_POS_Z
+
+  // move camera
+  _2d_zoom = zoom;
+  _camera.position.x = x;
+  _camera.position.y = y;
+  _camera.position.z = z;
+  _camera_moved_since_last_draw = true;
+
+  if (y == -1) {
+    move_camera_with_auto_height(_camera.position);
+    std::cout << "Map Z: " << _camera.position.y << std::endl;
+
+    unsigned char msg_type[1];
+    msg_type[0] = 'P';
+
+    unsigned char blob[4];
+    memcpy(blob, &_camera.position.y, sizeof(blob));
+
+    domain_socket->write((char*)msg_type, sizeof(msg_type));
+    domain_socket->waitForBytesWritten();
+
+    domain_socket->write((char*)blob, sizeof(blob));
+    domain_socket->waitForBytesWritten();
+
+    return; // early
+  }
+
+  // start render step
+  _frame_counter = 0;
+}
+
+
 void MapView::tick (float dt)
 {
 	_mod_shift_down = QApplication::keyboardModifiers().testFlag(Qt::ShiftModifier);
@@ -1623,24 +1724,52 @@ void MapView::tick (float dt)
   _world->mapIndex.enterTile (tile_index (_camera.position));
   _world->mapIndex.unloadTiles (tile_index (_camera.position));
 
-  int _tile_count = 0;
-  for (MapTile* tile : _world->mapIndex.loaded_tiles()) {
-    if (tile != NULL) _tile_count++;
+  if (_frame_counter != -1) {
+    _frame_counter++;
+    std::cout << "INFO FRAME: " << _frame_counter << std::endl;
   }
 
-  _frame_counter++;
+  if (_frame_counter == frame_wait_delta) {
+    std::cout << "DONE COMPLETELY FRAME: " << _frame_counter << std::endl;
 
-  if (_last_tile_count != _tile_count) {
-    _last_tile_count = _tile_count;
-    _last_changed_count_frame = _frame_counter;
-  } else if (_tile_count > 0 && _frame_counter - _last_tile_count > 20) {
-    std::cout << "DONE COMPLETELY FRAME: " << _frame_counter << " delta " << (_frame_counter - _last_tile_count) << std::endl;
     QImage image = grabFramebuffer();
-    bool saved = image.save("map.png");
-    std::cout << "SAVED FRAME: " << saved << " (" << image.width() << "x" << image.height() << ")" << std::endl;
-    kill(getpid(), SIGINT);
-  } else {
-    std::cout << "INFO FRAME: " << _frame_counter << " tiles: " << _tile_count << std::endl;
+
+    QByteArray ba;  
+    QBuffer buffer(&ba);  
+    bool saved = image.save(&buffer, "JPEG");  
+    int bsize = ba.size();
+    image.save("map.png", "PNG");
+
+    auto timenow = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::cout << "SAVED FRAME: " << saved << " (" << image.width() << "x" << image.height() << ") @ " << bsize << " " << ctime(&timenow) << std::endl;
+
+    unsigned char msg_type[1];
+    msg_type[0] = 'I';
+
+    unsigned char blob[4];
+    blob[0] = (bsize >> 24) & 0xFF;
+    blob[1] = (bsize >> 16) & 0xFF;
+    blob[2] = (bsize >> 8) & 0xFF;
+    blob[3] = bsize & 0xFF;
+
+    domain_socket->write((char*)msg_type, sizeof(msg_type));
+    domain_socket->waitForBytesWritten();
+
+    domain_socket->write((char*)blob, sizeof(blob));
+    domain_socket->waitForBytesWritten();
+
+    domain_socket->write(buffer.data());
+    domain_socket->waitForBytesWritten();
+
+    // conf
+    domain_socket->waitForReadyRead();
+
+    if (!first_frame_loaded) {
+      first_frame_loaded = true;
+      frame_wait_delta = 2;
+    }
+
+    _frame_counter = -1;
   }
 
   dt = std::min(dt, 1.0f);

@@ -23,6 +23,12 @@
 #include <QtWidgets/QOpenGLWidget>
 #include <QWidgetAction>
 
+#include <QLocalSocket>
+#include <QtNetwork>
+#include <QIODevice>
+#include <QTextStream>
+#include <QDataStream>
+
 #include <forward_list>
 #include <map>
 #include <unordered_set>
@@ -185,6 +191,10 @@ signals:
 public slots:
   void on_exit_prompt();
 
+  void socket_connected_callback();
+  void socket_disconnected_callback();
+  void socket_ready_read_callback();
+
 public:
   math::vector_4d cursor_color;
   math::vector_4d shader_color;
@@ -236,8 +246,10 @@ private:
   std::list<qreal> _last_frame_durations;
 
   int _frame_counter = 0;
-  int _last_tile_count = 0;
-  int _last_changed_count_frame = 0;
+
+  QLocalSocket *domain_socket = NULL;
+  QDataStream in;
+  quint32 block_size;
 
   float _last_fps_update = 0.f;
 

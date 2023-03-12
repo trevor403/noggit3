@@ -183,6 +183,7 @@ namespace noggit
     {
       std::cout << "Loading map..." << std::endl;
       int mapID = std::stoi(std::getenv("MAP_ID"));
+      if (mapID < 0) mapID = 0;
 
       float raw_z = std::stof(std::getenv("MAP_POS_X"));
       float raw_x = std::stof(std::getenv("MAP_POS_Y"));

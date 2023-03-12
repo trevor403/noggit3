@@ -9,7 +9,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 project(Noggit)
 
 option (NOGGIT_ALL_WARNINGS "Enable all warnings?" OFF)
-option (NOGGIT_LOGTOCONSOLE "Log to console instead of log.txt?" OFF)
+option (NOGGIT_LOGTOCONSOLE "Log to console instead of log.txt?" ON)
 option (NOGGIT_OPENGL_ERROR_CHECK "Enable OpenGL error check ?" ON)
 option (USE_SQL "Enable sql uid save ? (require mysql installed)" OFF)
 option (VALIDATE_OPENGL_PROGRAMS "Validate Opengl programs" ON)
@@ -136,7 +136,7 @@ endif()
 
 FIND_PACKAGE( OpenGL REQUIRED )
 FIND_PACKAGE( Boost 1.71 COMPONENTS thread filesystem system unit_test_framework REQUIRED )
-find_package (Qt5 COMPONENTS Widgets OpenGL OpenGLExtensions)
+find_package (Qt5 COMPONENTS Widgets Network OpenGL OpenGLExtensions)
 
 if (USE_SQL)
   find_library(MYSQL_LIBRARY
@@ -547,6 +547,7 @@ TARGET_LINK_LIBRARIES (noggit
   Boost::filesystem
   Boost::system
   Qt5::Widgets
+  Qt5::Network
   Qt5::OpenGL
   Qt5::OpenGLExtensions
   ColorWidgets-qt5
